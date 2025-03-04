@@ -1,0 +1,45 @@
+#Sudoku {
+    table-layout: fixed;
+    border-collapse: collapse;
+    width: 450px;
+    height: 450px;
+    text-align: center;
+    font-size: 24px;
+}
+
+#Sudoku td {
+    width: 50px;
+    height: 50px;
+    border: 1px solid black;
+    box-sizing: border-box;
+    position: relative;
+}
+
+#Sudoku tr:nth-child(3n) > td {
+    border-bottom: 2px solid black;
+}
+
+#Sudoku tr > td:nth-child(3n) {
+    border-right: 2px solid black;
+}
+
+/* 候補の数字用の内部テーブル */
+#Sudoku td table {
+    table-layout: fixed;
+    width: 100%;
+    height: 100%;
+    border-collapse: collapse;
+}
+
+#Sudoku td table td {
+    width: 16px;
+    height: 16px;
+    font-size: 12px;
+    text-align: center;
+    border: none;
+}
+/* マウスオーバー時の強調表示 */
+#Sudoku td.same-number {
+    background-color: rgba(255, 215, 0, 0.5); /* ゴールド系の半透明 */
+    outline: 2px solid orange; /* 強調枠 */
+}

@@ -1,0 +1,1 @@
+std::iter::Chain<Map<std::ops::Range<usize>, {closure@src\puzzle\puzzle.rs:124:18: 124:21}>, Map<std::ops::Range<usize>, {closure@src\puzzle\puzzle.rs:125:31: 125:34}>>
