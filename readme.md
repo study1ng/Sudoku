@@ -1,11 +1,13 @@
 # SudokuSolver
 A simple sudoku solver which supports such methods as:
+
 - Naked Single/pair/triple
 - Hidden Single/pair/triple
 - box-line reduction
 - X-Wing
 - XY-Wing
-Cuz I only can solve sudoku with these methods, so I only implemented these methods.# Sudoku
+
+Cuz I only can solve sudoku with these methods, so I only implemented these methods.
 
 ## Usage
 Make sure that cargo is installed on your system.
