@@ -1,4 +1,7 @@
-use std::ops::{Index, IndexMut};
+use std::{
+    collections::HashSet,
+    ops::{Index, IndexMut},
+};
 
 use crate::cell::Cell;
 
@@ -184,226 +187,194 @@ impl Puzzle {
         self.box_line_reduction();
         self.naked_pair();
         self.naked_triple();
+        self.hidden_pair();
+        self.hidden_triple();
+        self.x_wing();
+        self.xy_wing();
+    }
+
+    fn x_wing(&mut self) {
+        // 各数字について, ある二つの行/列が存在して, その行/列において数字が同じ二つの位置にのみ存在していた場合, その二つの位置の属する列/行からその数字を取り除く.
+        for i in 0..9 {
+            for j in i + 1..9 {
+                let tar = self.col(i).to_number_appearance();
+                let tar2 = self.col(j).to_number_appearance();
+                for k in 0..9 {
+                    if tar[k].count_ones() != 2 {
+                        continue;
+                    }
+                    if tar2[k] != tar[k] {
+                        continue;
+                    }
+                    for t in 0..9 {
+                        if (1 << t) & tar[k] == 0 {
+                            continue;
+                        }
+                        // t列の他のセルからkを取り除く.
+                        let mut row = self.row_mut(t);
+                        for l in 0..9 {
+                            if l == i || l == j {
+                                continue;
+                            }
+                            row[t] -= 1u16 << k;
+                        }
+                    }
+                }
+                let tar = self.row(i).to_number_appearance();
+                let tar2 = self.row(j).to_number_appearance();
+                for k in 0..9 {
+                    if tar[k].count_ones() != 2 {
+                        continue;
+                    }
+                    if tar2[k] != tar[k] {
+                        continue;
+                    }
+                    for t in 0..9 {
+                        if (1 << t) & tar[k] == 0 {
+                            continue;
+                        }
+                        // t行の他のセルからkを取り除く.
+                        let mut col = self.col_mut(t);
+                        for l in 0..9 {
+                            if l == i || l == j {
+                                continue;
+                            }
+                            col[t] -= 1u16 << k;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn xy_wing(&mut self) {
+        for i in 0..9 {
+            for j in 0..9 {
+                let idx = PuzzleIndex::new(i, j);
+                if self[idx].bit().count_ones() != 2 {
+                    continue;
+                }
+                let mut candidates = HashSet::new();
+                let tar = self.row(idx.row());
+                for i in 0..9 {
+                    if tar[i].is_filled()
+                        || tar[i].bit().count_ones() != 2
+                        || (tar[i].bit() & self[idx].bit()).count_ones() != 1
+                    {
+                        continue;
+                    }
+                    candidates.insert(tar[i].pos());
+                }
+                let tar = self.col(idx.col());
+                for i in 0..9 {
+                    if tar[i].is_filled()
+                        || tar[i].bit().count_ones() != 2
+                        || (tar[i].bit() & self[idx].bit()).count_ones() != 1
+                    {
+                        continue;
+                    }
+                    candidates.insert(tar[i].pos());
+                }
+                let tar = self.block(idx.block_idx());
+                for i in 0..9 {
+                    if tar[i].is_filled()
+                        || tar[i].bit().count_ones() != 2
+                        || (tar[i].bit() & self[idx].bit()).count_ones() != 1
+                    {
+                        continue;
+                    }
+                    candidates.insert(tar[i].pos());
+                }
+                fn is_same_group(i: &Cell, j: &Cell, k: &Cell) -> bool {
+                    (i.row() == j.row() && i.row() == k.row())
+                        || (i.col() == j.col() && i.col() == k.col())
+                        || (i.block_idx() == j.block_idx() && i.block_idx() == k.block_idx())
+                }
+                // 立っているビットの数が2かつself[idx]と一つだけ立っているビットが共通しているセルの集合
+                let candidates = candidates.into_iter().collect::<Vec<_>>();
+                for i in 0..candidates.len() {
+                    for j in i + 1..candidates.len() {
+                        let i = candidates[i];
+                        let j = candidates[j];
+                        // 三つのセルの論理和の立っているビットが3つで, self[idx]は二つのセルと異なる共通セルを持つ.
+                        if !is_same_group(&self[idx], &self[i], &self[j])
+                            && (self[i].bit()
+                                | self[j].bit()
+                                | self[idx].bit())
+                            .count_ones()
+                                == 3
+                            && (self[i].bit() & self[idx].bit()) != (self[j].bit() & self[idx].bit())
+                        {
+                            let common = self[i].bit()
+                                & self[j].bit();
+                            // candidates[i]とcandidates[j]の共通の影響範囲からcommonを取り除く
+                            // お互いの行/列の交差点
+                            self[PuzzleIndex::new(i.col(), j.row())] -= common;
+                            self[PuzzleIndex::new(j.col(), i.row())] -= common;
+                            // iのブロックかつjの行/列
+                            let mut block = self.block_mut(i.block_idx());
+                            for k in 0..9 {
+                                if block[k].pos() == i || block[k].pos() == j {
+                                    continue;
+                                }
+                                if block[k].col() == j.col() {
+                                    block[k] -= common;
+                                }
+                                if block[k].row() == j.row() {
+                                    block[k] -= common;
+                                }
+                            }
+                            // jのブロックかつiの行/列
+                            let mut block = self.block_mut(j.block_idx());
+                            for k in 0..9 {
+                                if block[k].pos() == i || block[k].pos() == j {
+                                    continue;
+                                }
+                                if block[k].col() == i.col() {
+                                    block[k] -= common;
+                                }
+                                if block[k].row() == i.row() {
+                                    block[k] -= common;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn naked_triple(&mut self) {
         for i in 0..9 {
-            let mut tar = self.block_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    for k in j + 1..9 {
-                        if tar[k].is_filled() {
-                            continue;
-                        }
-                        let bit = tar[i].bit() | tar[j].bit() | tar[k].bit();
-                        if bit.count_ones() != 3 {
-                            continue;
-                        }
-                        for l in 0..9 {
-                            if i == l || j == l || k == l {
-                                continue;
-                            }
-                            tar[l] -= bit;
-                            tar.determine(l);
-                        }
-                    }
-                }
-            }
-            let mut tar = self.col_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    for k in j + 1..9 {
-                        if tar[k].is_filled() {
-                            continue;
-                        }
-                        let bit = tar[i].bit() | tar[j].bit() | tar[k].bit();
-                        if bit.count_ones() != 3 {
-                            continue;
-                        }
-                        for l in 0..9 {
-                            if i == l || j == l || k == l {
-                                continue;
-                            }
-                            tar[l] -= bit;
-                            tar.determine(l);
-                        }
-                    }
-                }
-            }
-            let mut tar = self.row_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    for k in j + 1..9 {
-                        if tar[k].is_filled() {
-                            continue;
-                        }
-                        let bit = tar[i].bit() | tar[j].bit() | tar[k].bit();
-                        if bit.count_ones() != 3 {
-                            continue;
-                        }
-                        for l in 0..9 {
-                            if i == l || j == l || k == l {
-                                continue;
-                            }
-                            tar[l] -= bit;
-                            tar.determine(l);
-                        }
-                    }
-                }
-            }
+            self.block_mut(i).naked_triple();
+            self.col_mut(i).naked_triple();
+            self.row_mut(i).naked_triple();
         }
     }
 
     fn naked_pair(&mut self) {
         // 各行/列/ブロックにおいて, ある二つのセルのビット和のcount_onesが2に等しいならば, 他のセルからそのビット和を取り除く.
         for i in 0..9 {
-            let mut tar = self.block_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    let bit = tar[i].bit() | tar[j].bit();
-                    if bit.count_ones() != 2 {
-                        continue;
-                    }
-                    for k in 0..9 {
-                        if i == k || j == k {
-                            continue;
-                        }
-                        tar[k] -= bit;
-                        tar.determine(k);
-                    }
-                }
-            }
-            let mut tar = self.col_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    let bit = tar[i].bit() | tar[j].bit();
-                    if bit.count_ones() != 2 {
-                        continue;
-                    }
-                    for k in 0..9 {
-                        if i == k || j == k {
-                            continue;
-                        }
-                        tar[k] -= bit;
-                        tar.determine(k);
-                    }
-                }
-            }
-            let mut tar = self.row_mut(i);
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in i + 1..9 {
-                    if tar[j].is_filled() {
-                        continue;
-                    }
-                    let bit = tar[i].bit() | tar[j].bit();
-                    if bit.count_ones() != 2 {
-                        continue;
-                    }
-                    for k in 0..9 {
-                        if i == k || j == k {
-                            continue;
-                        }
-                        tar[k] -= bit;
-                        tar.determine(k);
-                    }
-                }
-            }
+            self.block_mut(i).naked_pair();
+            self.col_mut(i).naked_pair();
+            self.row_mut(i).naked_pair();
         }
     }
 
     fn hidden_single(&mut self) {
         // 各行/列/ブロックにおいて, あるビットが他のセルに含まれていないならば, そのセルにそのビットを入れる.
         for i in 0..9 {
-            let tar = self.block(i);
-            let mut cnt = [0; 9];
-            let mut pos = [PuzzleIndex::new(0, 0); 9];
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in 0..9 {
-                    if tar[i].bit() & (1 << j) != 0 {
-                        cnt[j] += 1;
-                        pos[j] = tar[i].pos();
-                    }
-                }
-            }
-            for i in 0..9 {
-                if cnt[i] == 1 {
-                    self.fill(pos[i], i as u8 + 1);
-                }
-            }
-            let tar = self.col(i);
-            let mut cnt = [0; 9];
-            let mut pos = [PuzzleIndex::new(0, 0); 9];
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in 0..9 {
-                    if tar[i].bit() & (1 << j) != 0 {
-                        cnt[j] += 1;
-                        pos[j] = tar[i].pos();
-                    }
-                }
-            }
-            for i in 0..9 {
-                if cnt[i] == 1 {
-                    self.fill(pos[i], i as u8 + 1);
-                }
-            }
-            let tar = self.row(i);
-            let mut cnt = [0; 9];
-            let mut pos = [PuzzleIndex::new(0, 0); 9];
-            for i in 0..9 {
-                if tar[i].is_filled() {
-                    continue;
-                }
-                for j in 0..9 {
-                    if tar[i].bit() & (1 << j) != 0 {
-                        cnt[j] += 1;
-                        pos[j] = tar[i].pos();
-                    }
-                }
-            }
-            for i in 0..9 {
-                if cnt[i] == 1 {
-                    self.fill(pos[i], i as u8 + 1);
-                }
-            }
+            self.block_mut(i).hidden_single();
+            self.col_mut(i).hidden_single();
+            self.row_mut(i).hidden_single();
+        }
+    }
+
+    fn hidden_pair(&mut self) {
+        for i in 0..9 {
+            self.block_mut(i).hidden_pair();
+            self.col_mut(i).hidden_pair();
+            self.row_mut(i).hidden_pair();
         }
     }
 
@@ -551,6 +522,14 @@ impl Puzzle {
                 let idx = self.block(b2_idx)[j].pos();
                 self.determine(idx);
             }
+        }
+    }
+
+    fn hidden_triple(&mut self) {
+        for i in 0..9 {
+            self.block_mut(i).hidden_triple();
+            self.col_mut(i).hidden_triple();
+            self.row_mut(i).hidden_triple();
         }
     }
 }

@@ -1,14 +1,19 @@
-use std::{fs::{read, File}, io::Write};
+use std::{fs::{read, File}, io::{stdin, Write}};
 
 use newsudoku::{puzzle::PuzzleIndex, Puzzle};
 
 fn main() {
-    let puzzle_seed =
-        "*5**8*91***2****6****5*13*****9********7***8*7*5**6**4***********9**51763*4**2***";
+    let mut puzzle_seed = String::new();
+    stdin().read_line(&mut puzzle_seed).unwrap();
+    let puzzle_seed = puzzle_seed.trim();
+    if puzzle_seed.len() != 81 {
+        println!("{}", puzzle_seed);
+        eprintln!("puzzle seed length must be 81 given is {}", puzzle_seed.len());
+        return;
+    }
     let mut puzzle = Puzzle::new();
     puzzle_seed
         .chars()
-        .take(81)
         .enumerate()
         .filter(|(_, c)| c.is_numeric())
         .for_each(|(i, c)| {

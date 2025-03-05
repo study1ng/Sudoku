@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PuzzleIndex {
     col: usize,
@@ -19,5 +21,12 @@ impl PuzzleIndex {
 
     pub fn block_idx(&self) -> usize {
         self.col / 3 * 3 + self.row / 3
+    }
+}
+
+impl Hash for PuzzleIndex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.col.hash(state);
+        self.row.hash(state);
     }
 }

@@ -1,12 +1,22 @@
-use std::ops::{BitAndAssign, SubAssign};
+use std::{fmt::Debug, ops::{BitAndAssign, SubAssign}};
 
 use super::_cell::_Cell;
 use crate::puzzle::PuzzleIndex;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Cell {
     cell: _Cell,
     pos: PuzzleIndex,
+}
+
+impl Debug for Cell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_filled() {
+            write!(f, "{}", self.cell.bit().trailing_zeros() + 1)
+        } else {
+            write!(f, "{:b}", self.cell.bit())
+        }
+    }
 }
 
 impl Cell {

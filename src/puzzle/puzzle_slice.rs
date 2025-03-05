@@ -23,6 +23,17 @@ impl<'a> PuzzleSlice<'a> {
     pub fn iter(&self) -> PuzzleIter<'_> {
         PuzzleIter::new(self, 0)
     }
+
+    pub fn to_number_appearance(&self) -> [u16; 9] {
+        // 各数字がどのマスに現れているかを表すビット列を返す
+        let mut ret = [0; 9];
+        for i in 0..9 {
+            for j in 0..9 {
+                ret[j] |= self[i].bit() & (1 << j);
+            }
+        }
+        ret
+    }
 }
 
 impl<'a> Index<usize> for PuzzleSlice<'a> {
@@ -93,6 +104,128 @@ impl<'a> PuzzleSliceMut<'a> {
     pub fn determine(&mut self, index: usize) {
         let pos = self[index].pos();
         self.puzzle.determine(pos);
+    }
+    pub fn to_number_appearance(&self) -> [u16; 9] {
+        // 各数字がどのマスに現れているかを表すビット列を返す
+        let bits = (0..9)
+            .map(|i| self[i].bit())
+            .enumerate()
+            .collect::<Vec<_>>();
+        let mut ret = [0; 9];
+        for (i, bit) in bits.iter() {
+            for j in 0..9 {
+                ret[j] |= (*bit & (1 << j)) >> j << i;
+            }
+        }
+        ret
+    }
+
+    pub(super) fn hidden_pair(&mut self) {
+        let appearance = self.to_number_appearance();
+        for i in 0..9 {
+            for j in i + 1..9 {
+                if appearance[i] != appearance[j] || appearance[i].count_ones() != 2 {
+                    continue;
+                }
+                for k in 0..9 {
+                    if (1 << k) & appearance[i] == 0 {
+                        continue;
+                    }
+                    self[k] &= (1 << i) | (1u16 << j);
+                }
+            }
+        }
+    }
+
+    pub(super) fn hidden_single(&mut self) {
+        let appearance = self.to_number_appearance();
+        for i in 0..9 {
+            if appearance[i].count_ones() != 1 {
+                continue;
+            }
+            self.puzzle.fill(
+                self[appearance[i].trailing_zeros() as usize].pos(),
+                i as u8 + 1,
+            );
+        }
+    }
+
+    pub(super) fn naked_pair(&mut self) {
+        for i in 0..9 {
+            if self[i].is_filled() {
+                continue;
+            }
+            for j in i + 1..9 {
+                if self[j].is_filled() {
+                    continue;
+                }
+                let bit = self[i].bit() | self[j].bit();
+                if bit.count_ones() != 2 {
+                    continue;
+                }
+                for k in 0..9 {
+                    if i == k || j == k {
+                        continue;
+                    }
+                    self[k] -= bit;
+                    self.determine(k);
+                }
+            }
+        }
+    }
+
+    pub(super) fn naked_triple(&mut self) {
+        for i in 0..9 {
+            if self[i].is_filled() {
+                continue;
+            }
+            for j in i + 1..9 {
+                if self[j].is_filled() {
+                    continue;
+                }
+                for k in j + 1..9 {
+                    if self[k].is_filled() {
+                        continue;
+                    }
+                    let bit = self[i].bit() | self[j].bit() | self[k].bit();
+                    if bit.count_ones() != 3 {
+                        continue;
+                    }
+                    for l in 0..9 {
+                        if i == l || j == l || k == l {
+                            continue;
+                        }
+                        self[l] -= bit;
+                        self.determine(l);
+                    }
+                }
+            }
+        }
+    }
+
+    pub(super) fn hidden_triple(&mut self) {
+        let appearance = self.to_number_appearance();
+        for i in 0..9 {
+            if appearance[i].count_ones() != 3 {
+                continue;
+            }
+            for j in i + 1..9 {
+                if appearance[i] != appearance[j]{
+                    continue;
+                }
+                for k in j + 1..9 {
+                    if appearance[i] != appearance[k]{
+                        continue;
+                    }
+                    for l in 0..9 {
+                        if (1 << l) & appearance[i] == 0 {
+                            continue;
+                        }
+                        self[l] &= (1 << i) | (1 << j) | (1u16 << k);
+                    }
+                }
+            }
+        }
     }
 }
 
