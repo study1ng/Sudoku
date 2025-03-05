@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::{fs::{read, File}, io::Write};
 
 use newsudoku::{puzzle::PuzzleIndex, Puzzle};
 
@@ -22,19 +22,37 @@ fn main() {
         hash != puzzle.hash()
     } {}
     puzzle.validate();
-    let mut string = String::new();
-    let mut file = File::create(".ans").unwrap();
+    let mut string = read(".html").unwrap();
+    let mut file = File::create("index.html").unwrap();
     for i in 0..9 {
         for j in 0..9 {
             for k in 0..9 {
                 if (1 << k) & puzzle[PuzzleIndex::new(i, j)].bit() != 0 {
-                    string += (k + 1).to_string().as_str();
+                    string.push(k as u8 + b'1');
                 }
             }
-            string += "/";
+            string.push(b'/');
         }
     }
     string.pop();
-    string.push('\n');
-    file.write_all(string.as_bytes()).unwrap();
+    string.append(b"`</script><script src=\".js\"></script></body></html>".to_vec().as_mut());
+    file.write_all(&string[..]).unwrap();
+    // open ./index.html in browser
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd")
+        .arg("/C")
+        .arg("start")
+        .arg("index.html")
+        .spawn()
+        .unwrap();
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open")
+        .arg("index.html")
+        .spawn()
+        .unwrap();
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open")
+        .arg("index.html")
+        .spawn()
+        .unwrap();
 }

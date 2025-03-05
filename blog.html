@@ -1,0 +1,59 @@
+<p>
+    春休み暇すぎてナンプレやってました。<br>
+    数独にはいくつかテクニックと呼ばれるものがあるのですが, たまに見落としてしまうので, 機械でやってもらおうと思って数独を解くプログラムを作りました。<br>
+    せっかく作ったから紹介したいと思ったので紹介します。<br>
+    バックトラックとか使ってないので解けない場合もあります。
+</p>
+
+<div id="overview">
+    <h2>全体像</h2>
+    数独を解くプログラムはRustによる解答部分とhtml/css/jsによる表示部分に分かれています。
+    本記事ではRustによる解答部分について説明します。
+    コードはcell/_cell.rs, cell/cell.rs, puzzle/puzzle_index.rs, puzzle/puzzle_slice.rs, puzzle.rs, main.rsにファイル分割されています。<br>
+    <a href="https://github.com/study1ng/Sudoku" target="_blank" rel="noopener noreferrer">Githubに公開</a>しているので, 興味があれば見てみてください。<br>
+    内部では主に<code>_Cell</code>, <code>Cell</code>, <code>PuzzleIndex</code>, <code>PuzzleSlice</code>, <code>Puzzle</code>という構造体を使っています。
+    <h3><code>_Cell</code></h3>
+    <p>
+        <code>_Cell</code>はセルの値を表す<code>enum</code>で, そのセルの値が確定していた場合, <code>Filled(u8)</code>の形でその値を,
+        まだ確定していない場合, <code>Unfilled(u16)</code>の形で候補をフラグで保持します。<br>
+        楽なので<code>BitAndAssign&lt;T: Into&lt;u16&gt;&gt;</code>, <code>SubAssign&lt;T: Into&lt;u16&gt;&gt;</code>, <code>Into&lt;u16&gt;</code>
+        を実装しています.
+    </p>
+    <h3><code>Cell</code></h3>
+    <p>
+        <code>Cell</code>はセルの値を表す<code>struct</code>で, <code>_Cell</code>を内部に保持した上で。
+        また, そのセルが所属する行, 列のインデックスである<code>PuzzleIndex</code>を持ちます。<br>
+        基本<code>_Cell</code>と<code>PuzzleIndex</code>を継承したようなメソッドを実装しています。
+    </p>
+    <h3><code>PuzzleIndex</code></h3>
+    <p>
+        <code>PuzzleIndex</code>は行, 列のインデックスを持つ<code>struct</code>です。行と列の意味が頭の中でごちゃごちゃになっていたせいでめちゃくちゃバグりました。<br>
+        自分自身が指し示す位置のブロックのインデックスを返す<code>block_idx</code>というメソッドを実装しています。
+    </p>
+    <h3><code>PuzzleSlice</code></h3>
+    <p>
+        <code>PuzzleSlice</code>はパズルの行/列/ブロックのいずれかを表す<code>struct</code>です。Rustに標準であるスライスを使いたかったけど
+        当然行はともかく, 列やブロックだとデータがメモリ上でとびとびになっちゃってスライスは利用できないので,
+        それを補うために作りました。<br>
+        内部的には<code>Puzzle</code>への参照を保持し, Indexによる参照が来た時に<code>PuzzleIndex</code>を計算し, <code>Cell</code>への参照を返します。
+        これを<code>mut</code>にした<code>PuzzleSliceMut</code>もあってこっちには<code>IndexMut</code>も実装しています。
+        これらは<code>Iterator</code>でも回せるようにしており, <code>PuzzleIter</code>という独自のイテレータを返します。
+        ほんとは<code>PuzzleIterMut</code>も欲しかったけどライフタイムとかがややこしくてやめました。
+    </p>
+    <h3><code>Puzzle</code></h3>
+    <p>
+        <code>Puzzle</code>はパズルそのものです。<code>PuzzleIndex</code>による<code>Index</code>や<code>IndexMut</code>を実装しています。
+        また, <code>PuzzleSlice</code>を返す<code>row</code>, <code>col</code>, <code>block</code>というメソッドを実装しています。
+        実装しているメソッドはnaked-single/pair/triple, hidden-single, block-line reductionです。
+        また, メソッドを実行して, 何か変化があったかを検知するために, <code>hash</code>を実装しており, これはパズルの状態に応じて一意な文字列を返し,
+        これの値の変化に応じてメソッドを何回適用するか決めています。
+    </p>
+</div>
+
+<div id="epilogue">
+    <h2>最後に</h2>
+    <p>
+        最初はほんとは<code>Rc&lt;RefCell&lt;T&gt;&gt;</code>の形でいろいろ管理することで, <code>Cell</code>から<code>Puzzle</code>にアクセスしたりできるようにするつもりでしたが, 
+        <code>Borrow Mut Error</code>みたいなのが多発したので断念しました。
+    </p>
+</div>
